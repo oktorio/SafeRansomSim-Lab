@@ -1,0 +1,29 @@
+"""Safety constants for SafeRansomSim-Lab.
+
+There is deliberately no user-configurable target directory.
+"""
+
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent
+LAB_ROOT = (BASE_DIR / "ransomware_lab").resolve()
+TARGET_ROOT = LAB_ROOT / "test123"
+BACKUP_ROOT = LAB_ROOT / "backups"
+LOG_ROOT = LAB_ROOT / "logs"
+RECOVERY_ROOT = LAB_ROOT / "recovery"
+MANIFEST_FILE = LAB_ROOT / "manifest.json"
+AUTH_FILE = LAB_ROOT / "AUTHORIZED_LAB.txt"
+STOP_FILE = LAB_ROOT / "STOP_SIMULATION"
+RANSOM_NOTE = TARGET_ROOT / "SIMULATED_RANSOM_NOTE.txt"
+KEY_FILE = RECOVERY_ROOT / "demo_key.bin"
+
+AUTH_PHRASE = "I_AUTHORIZE_SAFE_RANSOMWARE_SIMULATION"
+TEST_MARKER = b"SAFE_RANSOMSIM_TEST_FILE\n"
+LOCKED_SUFFIX = ".SIMULATED_LOCKED"
+ENCRYPTED_MAGIC = b"SAFERSIM1"
+KEY_LABEL = b"DEMO RECOVERY KEY - NOT REAL RANSOMWARE"
+
+MAX_FILES = 100
+MAX_FILE_SIZE = 5 * 1024 * 1024
+MAX_TOTAL_SIZE = 100 * 1024 * 1024
+MAX_RECURSION_DEPTH = 3
