@@ -1,0 +1,37 @@
+"""Fixed safety configuration for SafeRansomSim-Lab.
+
+No target path is configurable by environment variable, CLI flag, or config file.
+"""
+
+from pathlib import Path
+
+PROJECT_NAME = "SafeRansomSim-Lab"
+PROJECT_VERSION = "0.2.0-lab"
+TELEMETRY_SCHEMA_VERSION = 1
+REPORT_SCHEMA_VERSION = 1
+
+BASE_DIR = Path(__file__).resolve().parents[1]
+LAB_ROOT = BASE_DIR / "ransomware_lab"
+TARGET_ROOT = LAB_ROOT / "test123"
+BACKUP_ROOT = LAB_ROOT / "backups"
+LOG_ROOT = LAB_ROOT / "logs"
+RECOVERY_ROOT = LAB_ROOT / "recovery"
+REPORT_ROOT = LAB_ROOT / "reports"
+
+MANIFEST_FILE = LAB_ROOT / "manifest.json"
+AUTH_FILE = LAB_ROOT / "AUTHORIZED_LAB.txt"
+STOP_FILE = LAB_ROOT / "STOP_SIMULATION"
+RANSOM_NOTE = TARGET_ROOT / "SIMULATED_RANSOM_NOTE.txt"
+KEY_FILE = RECOVERY_ROOT / "demo_key.bin"
+EVENT_LOG = LOG_ROOT / "events.jsonl"
+
+AUTH_PHRASE = "I_AUTHORIZE_SAFE_RANSOMWARE_SIMULATION"
+TEST_MARKER = b"SAFE_RANSOMSIM_TEST_FILE\n"
+LOCKED_SUFFIX = ".SIMULATED_LOCKED"
+ENCRYPTED_MAGIC = b"SAFERSIM1"
+KEY_LABEL = b"DEMO RECOVERY KEY - NOT REAL RANSOMWARE"
+
+MAX_FILES = 100
+MAX_FILE_SIZE = 5 * 1024 * 1024
+MAX_TOTAL_SIZE = 100 * 1024 * 1024
+MAX_RECURSION_DEPTH = 3

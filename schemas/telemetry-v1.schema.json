@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/saferansomsim/telemetry-v1.schema.json",
+  "title": "SafeRansomSim-Lab Telemetry v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "project",
+    "project_version",
+    "timestamp",
+    "session_id",
+    "event"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "project": {"const": "SafeRansomSim-Lab"},
+    "project_version": {"type": "string"},
+    "timestamp": {"type": "string"},
+    "session_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+    "event": {"type": "string"}
+  },
+  "additionalProperties": true
+}
