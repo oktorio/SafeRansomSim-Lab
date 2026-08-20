@@ -81,6 +81,13 @@ def test_manifest_file_count_limit(isolated_lab: Path) -> None:
         simulator.load_manifest()
 
 
+def test_individual_file_size_limit_is_enforced(isolated_lab: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(config, "MAX_FILE_SIZE", 10)
+    manifest = simulator.load_manifest()
+    with pytest.raises(simulator.SafetyError, match="File exceeds"):
+        simulator.validate_inventory(manifest)
+
+
 def test_total_size_limit_is_enforced(isolated_lab: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(config, "MAX_TOTAL_SIZE", 10)
     manifest = simulator.load_manifest()
