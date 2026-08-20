@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Runtime lab artifacts - never commit these
+ransomware_lab/AUTHORIZED_LAB.txt
+ransomware_lab/STOP_SIMULATION
+ransomware_lab/manifest.json
+ransomware_lab/test123/
+ransomware_lab/backups/
+ransomware_lab/logs/
+ransomware_lab/recovery/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
