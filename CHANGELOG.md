@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.3.0-lab — 2026-08-20
+
+### Added
+- Fixed SOC/IR exercise framework with `basic`, `interrupted`,
+  `recovery-failure`, and `false-positive` scenarios.
+- Static synthetic JSONL telemetry datasets that can be replayed without
+  running the encryption simulation.
+- Fixed-root analyst worksheet generation under
+  `ransomware_lab/exercises/<scenario>/`.
+- Deterministic 100-point scoring engine with JSON and HTML score output.
+- Exercise response and score JSON schemas.
+- Detection Pack validator for Sigma YAML metadata, UUID uniqueness,
+  ATT&CK tags, SIEM query guidance, and Sysmon guidance.
+- Dedicated `Detection Pack Validation` GitHub Actions job.
+- CLI commands for listing, preparing, replaying, scoring scenarios, and
+  validating detections.
+
+### Safety
+- Scenario selection is limited to compiled scenario IDs.
+- No arbitrary dataset, response file, target, host, path, or command option
+  was introduced.
+- Synthetic exercise mode does not require encryption, authorization, network
+  access, or elevated privileges.
+
 ## v0.2.0-lab — 2026-08-20
 
 ### Added

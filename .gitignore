@@ -14,6 +14,7 @@ ransomware_lab/backups/
 ransomware_lab/logs/
 ransomware_lab/recovery/
 ransomware_lab/reports/
+ransomware_lab/exercises/
 
 # OS/editor
 .DS_Store

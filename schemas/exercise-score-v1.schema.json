@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/saferansomsim/exercise-score-v1.schema.json",
+  "title": "SafeRansomSim-Lab Exercise Score v1",
+  "type": "object",
+  "required": ["project", "project_version", "schema_version", "scenario_id", "score", "max_score", "grade", "breakdown"],
+  "properties": {
+    "project": {"const": "SafeRansomSim-Lab"},
+    "project_version": {"type": "string"},
+    "schema_version": {"const": 1},
+    "scenario_id": {"enum": ["basic", "interrupted", "recovery-failure", "false-positive"]},
+    "score": {"type": "integer", "minimum": 0, "maximum": 100},
+    "max_score": {"const": 100},
+    "grade": {"enum": ["excellent", "proficient", "developing", "needs_review"]},
+    "breakdown": {"type": "object"}
+  },
+  "additionalProperties": true
+}

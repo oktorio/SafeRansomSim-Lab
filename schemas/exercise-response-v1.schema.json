@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/saferansomsim/exercise-response-v1.schema.json",
+  "title": "SafeRansomSim-Lab Exercise Response v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "scenario_id",
+    "classification",
+    "identified_event_types",
+    "containment_actions",
+    "recovery_actions",
+    "false_positive_assessment",
+    "analyst_notes"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "scenario_id": {"enum": ["basic", "interrupted", "recovery-failure", "false-positive"]},
+    "classification": {"type": "string"},
+    "identified_event_types": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "containment_actions": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "recovery_actions": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "false_positive_assessment": {"type": "string"},
+    "analyst_notes": {"type": "string"}
+  },
+  "additionalProperties": false
+}
