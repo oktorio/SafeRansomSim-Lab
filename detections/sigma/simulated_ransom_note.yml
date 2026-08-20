@@ -1,0 +1,19 @@
+title: SafeRansomSim Simulated Ransom Note Creation
+id: a17eaaab-d203-4b93-b15f-d383e8669b58
+status: test
+description: Detects the harmless SafeRansomSim-Lab simulated ransom note.
+author: SafeRansomSim-Lab
+date: 2026-08-20
+tags:
+  - attack.impact
+  - attack.t1486
+logsource:
+  category: file_event
+  product: windows
+detection:
+  selection:
+    TargetFilename|endswith: '\\SIMULATED_RANSOM_NOTE.txt'
+  condition: selection
+falsepositives:
+  - Expected when intentionally running SafeRansomSim-Lab
+level: low

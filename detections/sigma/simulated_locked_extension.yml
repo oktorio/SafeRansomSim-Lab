@@ -1,0 +1,19 @@
+title: SafeRansomSim Simulated Locked File Creation
+id: 581f41d4-4af1-4d5b-a711-d520365fc0ce
+status: test
+description: Detects creation of SafeRansomSim-Lab .SIMULATED_LOCKED artifacts in a defensive lab.
+author: SafeRansomSim-Lab
+date: 2026-08-20
+tags:
+  - attack.impact
+  - attack.t1486
+logsource:
+  category: file_event
+  product: windows
+detection:
+  selection:
+    TargetFilename|endswith: '.SIMULATED_LOCKED'
+  condition: selection
+falsepositives:
+  - Expected when intentionally running SafeRansomSim-Lab
+level: low

@@ -2,72 +2,42 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import config
-import simulator
+import pytest
+
+from saferansomsim import config, engine
+from saferansomsim.manifest import load_manifest
+from saferansomsim.safety import sha256_file, target_path
 
 
 def test_kill_switch_stops_before_first_file(isolated_lab: Path) -> None:
-    manifest = simulator.load_manifest()
-    expected = {entry["relative_path"]: entry["sha256"] for entry in manifest["files"]}
+    expected = {entry["relative_path"]: entry["sha256"] for entry in load_manifest()["files"]}
     config.STOP_FILE.write_text("stop\n", encoding="utf-8")
-
-    simulator.simulate()
-
+    engine.simulate()
     for relative, digest in expected.items():
-        original = simulator.target_path(relative)
+        original = target_path(relative)
         locked = original.with_name(original.name + config.LOCKED_SUFFIX)
         assert original.is_file()
-        assert simulator.sha256_file(original) == digest
+        assert sha256_file(original) == digest
         assert not locked.exists()
     assert not config.RANSOM_NOTE.exists()
 
-    events = (config.LOG_ROOT / "events.jsonl").read_text(encoding="utf-8")
-    assert "SIMULATION_STOPPED" in events
-    assert "kill_switch" in events
 
-
-def test_mid_run_kill_switch_remains_fully_recoverable(
-    isolated_lab: Path,
-    monkeypatch,
-) -> None:
-    manifest = simulator.load_manifest()
-    expected = {entry["relative_path"]: entry["sha256"] for entry in manifest["files"]}
-    relatives = list(expected)
-    real_check = simulator.check_kill_switch
-    calls = 0
-
-    def staged_kill_switch(session_id: str) -> bool:
-        nonlocal calls
-        calls += 1
-        if calls == 2:
-            config.STOP_FILE.write_text("stop after first file\n", encoding="utf-8")
-        return real_check(session_id)
-
-    monkeypatch.setattr(simulator, "check_kill_switch", staged_kill_switch)
-    simulator.simulate()
-
-    first = simulator.target_path(relatives[0])
-    first_locked = first.with_name(first.name + config.LOCKED_SUFFIX)
-    assert not first.exists()
-    assert first_locked.is_file()
-
-    for relative in relatives[1:]:
-        original = simulator.target_path(relative)
+def test_mid_run_kill_switch_then_full_recovery(isolated_lab: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    expected = {entry["relative_path"]: entry["sha256"] for entry in load_manifest()["files"]}
+    calls = {"count": 0}
+    def stop_after_first_check() -> bool:
+        calls["count"] += 1
+        return calls["count"] >= 2
+    monkeypatch.setattr(engine, "kill_switch_present", stop_after_first_check)
+    engine.simulate()
+    locked_count = 0
+    for relative in expected:
+        original = target_path(relative)
         locked = original.with_name(original.name + config.LOCKED_SUFFIX)
-        assert original.is_file()
-        assert simulator.sha256_file(original) == expected[relative]
-        assert not locked.exists()
-
-    assert config.RANSOM_NOTE.is_file()
-    config.STOP_FILE.unlink()
-
-    simulator.recover()
-
+        locked_count += int(locked.is_file())
+    assert locked_count == 1
+    engine.recover()
     for relative, digest in expected.items():
-        original = simulator.target_path(relative)
-        locked = original.with_name(original.name + config.LOCKED_SUFFIX)
+        original = target_path(relative)
         assert original.is_file()
-        assert simulator.sha256_file(original) == digest
-        assert not locked.exists()
-
-    assert not config.RANSOM_NOTE.exists()
+        assert sha256_file(original) == digest

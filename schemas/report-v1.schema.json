@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/saferansomsim/report-v1.schema.json",
+  "title": "SafeRansomSim-Lab Run Report v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "project",
+    "project_version",
+    "generated_at",
+    "session_id",
+    "operation",
+    "safety_boundary",
+    "summary",
+    "telemetry"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "project": {"const": "SafeRansomSim-Lab"},
+    "project_version": {"type": "string"},
+    "generated_at": {"type": "string"},
+    "session_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+    "operation": {"type": "string"},
+    "safety_boundary": {"type": "object"},
+    "summary": {"type": "object"},
+    "telemetry": {"type": "object"}
+  },
+  "additionalProperties": false
+}
