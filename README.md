@@ -1,6 +1,6 @@
 # SafeRansomSim-Lab
 
-**Current lab release: `v0.4.0-lab`**
+**Current lab release: `v0.5.0-lab`**
 
 SafeRansomSim-Lab is a deliberately constrained, non-propagating ransomware-behavior simulator and blue-team SOC/IR exercise framework. It prioritizes containment, reversibility, observability, evidence integrity, and defensive learning over offensive realism.
 
@@ -12,25 +12,26 @@ The CLI has no arbitrary target, path, host, share, external dataset, external r
 
 Use a disposable VM, run as a normal non-admin/non-root user, take a snapshot first, and do not mount host drives or shared folders. Synthetic SOC/IR exercises can be used without running encryption at all.
 
+## v0.5 detection-content maintenance
+
+`v0.5.0-lab` changes defensive training content and maintenance controls only; simulator behavior is unchanged.
+
+- adds `benign-backup-burst` for bursty-write false-positive discrimination;
+- adds `mixed-signal` for separating benign noise from the known simulator chain;
+- adds `telemetry-gap` for explicit inconclusive triage when evidence is incomplete;
+- adds dataset-quality regression tests for required evidence, timestamp ordering, and session consistency;
+- updates the fixed scenario enums used by scoring/evidence schemas;
+- updates `pytest` to the current pinned release and adds `pip check` to the cross-platform matrix.
+
 ## v0.4 hardening
 
-`v0.4.0-lab` adds engineering and evidence controls around the existing defensive lab:
-
-- pinned direct Python dependencies;
-- SHA-pinned GitHub Actions;
-- weekly Dependabot updates for pip and GitHub Actions;
-- CodeQL scanning;
-- dependency vulnerability auditing with `pip-audit`;
-- JSON Schema validation for bundled datasets and generated artifact models;
-- SHA-256 evidence manifests for SOC/IR exercises;
-- evidence verification before scoring and post-score artifact hashing;
-- mutation-safety regression tests;
-- `SECURITY.md`, `CONTRIBUTING.md`, CODEOWNERS, PR/issue templates, and a release checklist.
+`v0.4.0-lab` added pinned dependencies, SHA-pinned Actions, Dependabot, CodeQL, `pip-audit`, schema validation, SHA-256 evidence manifests, mutation-safety tests, and project governance files.
 
 ## Quick validation
 
 ```bash
 python -m pip install -r requirements.txt
+python -m pip check
 python -m pytest -q
 python simulator.py --validate-detections
 python simulator.py --validate-schemas
@@ -47,39 +48,29 @@ basic
 interrupted
 recovery-failure
 false-positive
+benign-backup-burst
+mixed-signal
+telemetry-gap
 ```
 
 List and prepare:
 
 ```bash
 python simulator.py --list-scenarios
-python simulator.py --exercise basic
+python simulator.py --exercise telemetry-gap
 ```
 
-Exercise artifacts are created only under:
-
-```text
-ransomware_lab/exercises/<scenario>/
-```
-
-A prepared exercise contains synthetic evidence, an analyst worksheet, and `evidence-manifest.json`. Verify evidence before using it:
+Exercise artifacts are created only under `ransomware_lab/exercises/<scenario>/`. Verify evidence before scoring:
 
 ```bash
-python simulator.py --verify-evidence basic
+python simulator.py --verify-evidence telemetry-gap
+python simulator.py --score-exercise telemetry-gap
 ```
 
-Complete `analyst-response.json`, then score:
+Scoring refuses to proceed if immutable exercise evidence fails SHA-256 verification. Analysts can replay bundled synthetic telemetry without encryption:
 
 ```bash
-python simulator.py --score-exercise basic
-```
-
-Scoring refuses to proceed if the immutable exercise evidence fails SHA-256 verification. After scoring, the analyst response and JSON/HTML score artifacts are added to the evidence manifest and verified again.
-
-Analysts can also replay bundled synthetic telemetry without encryption:
-
-```bash
-python simulator.py --replay-scenario interrupted
+python simulator.py --replay-scenario mixed-signal
 ```
 
 ## Simulator commands
@@ -109,26 +100,11 @@ The Detection Pack includes lab-specific Sigma examples, Sysmon observation guid
 ## Architecture
 
 ```text
-saferansomsim/
-  cli.py
-  config.py
-  safety.py
-  manifest.py
-  crypto_demo.py
-  telemetry.py
-  reporting.py
-  engine.py
-  scenarios.py
-  exercises.py
-  scoring.py
-  evidence.py
-  detection_validation.py
-  schema_validation.py
-
+saferansomsim/      fixed-sandbox engine and SOC/IR framework
 datasets/           fixed synthetic SOC/IR telemetry
 detections/         defensive Detection Pack
 schemas/            versioned JSON Schemas
-tests/              containment, recovery, evidence, mutation, schema tests
+tests/              containment, recovery, evidence, mutation, schema and dataset-quality tests
 .github/             CI, CodeQL, Dependabot, governance templates
 ```
 
@@ -136,7 +112,7 @@ See `docs/architecture.md`, `docs/soc-ir-exercises.md`, and `docs/release-checkl
 
 ## CI and supply-chain controls
 
-GitHub Actions runs the safety suite on Ubuntu and Windows with Python 3.11 and 3.12, plus dedicated Detection Pack Validation, Schema Validation, Dependency Audit, and CodeQL jobs. External GitHub Actions are referenced by immutable commit SHA; Dependabot is configured to propose updates rather than relying on moving major-version tags.
+GitHub Actions runs the safety suite on Ubuntu and Windows with Python 3.11 and 3.12, plus dedicated Detection Pack Validation, Schema Validation, Dependency Audit, and CodeQL jobs. External Actions remain immutable-SHA pinned; Dependabot proposes updates.
 
 ## Governance
 

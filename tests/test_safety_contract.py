@@ -8,6 +8,7 @@ from saferansomsim.cli import build_parser
 
 FORBIDDEN_IMPORT_ROOTS = {"socket", "requests", "subprocess", "paramiko", "ftplib", "telnetlib", "smtplib", "httpx", "aiohttp", "winreg"}
 FORBIDDEN_SOURCE_TOKENS = {"schtasks", "powershell.exe", "cmd.exe", "vssadmin", "wbadmin", "bcdedit", "wevtutil", "credential dumping", "uac bypass"}
+EXPECTED_SCENARIOS = {"basic", "interrupted", "recovery-failure", "false-positive", "benign-backup-burst", "mixed-signal", "telemetry-gap"}
 
 
 def _package_files() -> list[Path]:
@@ -27,9 +28,8 @@ def test_cli_exposes_no_arbitrary_target_or_external_input_option() -> None:
 
 def test_scenario_cli_choices_are_fixed() -> None:
     actions = {option: action for action in build_parser()._actions for option in action.option_strings}
-    expected = {"basic", "interrupted", "recovery-failure", "false-positive"}
     for option in ("--exercise", "--replay-scenario", "--score-exercise", "--verify-evidence"):
-        assert set(actions[option].choices) == expected
+        assert set(actions[option].choices) == EXPECTED_SCENARIOS
 
 
 def test_fixed_target_is_test123_under_lab_root() -> None:
