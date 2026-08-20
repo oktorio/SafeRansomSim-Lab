@@ -1,10 +1,10 @@
 # SafeRansomSim-Lab
 
-**Current lab release: `v0.2.0-lab`**
+**Current lab release: `v0.3.0-lab`**
 
-A deliberately constrained, non-propagating ransomware-behavior simulator for
-cybersecurity education, blue-team detection engineering, incident response,
-cryptography learning, and recovery testing.
+A deliberately constrained, non-propagating ransomware-behavior simulator and
+blue-team exercise framework for cybersecurity education, detection engineering,
+incident response, cryptography learning, and recovery testing.
 
 > **THIS SOFTWARE IS A NON-PROPAGATING EDUCATIONAL RANSOMWARE SIMULATOR. IT IS
 > DESIGNED TO OPERATE ONLY ON DISPOSABLE FILES CREATED INSIDE ITS OWN SANDBOX.**
@@ -21,7 +21,7 @@ Use a **disposable VM** for simulation runs. Recommended controls:
 - run `python simulator.py --dry-run` and `python -m pytest -q` before the first
   `--simulate` execution.
 
-Application-level guardrails remain mandatory even inside a VM.
+The synthetic SOC/IR exercises can be used without running encryption at all.
 
 ## Safety model
 
@@ -31,8 +31,8 @@ The only file-processing target is hard-coded to:
 ./ransomware_lab/test123/
 ```
 
-The CLI intentionally has **no `--target`, `--path`, `--directory`, host, share,
-or remote execution option**.
+The CLI intentionally has **no arbitrary target, path, directory, host, share,
+dataset file, response file, remote execution, or command option**.
 
 Core safeguards include:
 
@@ -52,9 +52,8 @@ Core safeguards include:
   or evasion;
 - no network activity.
 
-Automated **safety-contract tests** fail if prohibited target options or
-network/remote-execution/process capability imports are introduced into the
-package.
+Automated **safety-contract tests** fail if prohibited target/external-input
+options or network/remote-execution/process capability imports are introduced.
 
 ## Architecture
 
@@ -70,7 +69,16 @@ SafeRansomSim-Lab/
 │   ├── crypto_demo.py
 │   ├── telemetry.py
 │   ├── reporting.py
-│   └── engine.py
+│   ├── engine.py
+│   ├── scenarios.py
+│   ├── exercises.py
+│   ├── scoring.py
+│   └── detection_validation.py
+├── datasets/
+│   ├── basic/
+│   ├── interrupted/
+│   ├── recovery-failure/
+│   └── false-positive/
 ├── detections/
 │   ├── sigma/
 │   ├── sysmon/
@@ -80,7 +88,8 @@ SafeRansomSim-Lab/
 └── docs/
 ```
 
-See [`docs/architecture.md`](docs/architecture.md).
+See [`docs/architecture.md`](docs/architecture.md) and
+[`docs/soc-ir-exercises.md`](docs/soc-ir-exercises.md).
 
 ## Quick start
 
@@ -113,6 +122,7 @@ Validate first:
 ```bash
 python simulator.py --dry-run
 python -m pytest -q
+python simulator.py --validate-detections
 ```
 
 Run the controlled simulation:
@@ -127,7 +137,7 @@ Recover:
 python simulator.py --recover
 ```
 
-Other commands:
+Other simulation commands:
 
 ```bash
 python simulator.py --status
@@ -139,6 +149,69 @@ python simulator.py --version
 `--simulate-initial-access` emits only a harmless local telemetry event
 representing a training scenario. It does not create or deliver an email,
 attachment, macro, exploit, downloader, or phishing page.
+
+## SOC/IR Exercise Framework
+
+`v0.3.0-lab` adds four fixed, synthetic scenarios:
+
+- `basic`
+- `interrupted`
+- `recovery-failure`
+- `false-positive`
+
+List them:
+
+```bash
+python simulator.py --list-scenarios
+```
+
+Prepare an exercise:
+
+```bash
+python simulator.py --exercise basic
+```
+
+This creates only fixed-root exercise artifacts:
+
+```text
+ransomware_lab/exercises/basic/
+├── LAB_NOTICE.txt
+├── briefing.md
+├── analyst-response.json
+└── evidence/
+    └── events.jsonl
+```
+
+Edit `analyst-response.json`, then score it:
+
+```bash
+python simulator.py --score-exercise basic
+```
+
+The score is deterministic out of 100 points:
+
+- classification: 25;
+- evidence identification: 25;
+- containment: 20;
+- recovery: 20;
+- false-positive handling: 10.
+
+The framework writes `score.json` and `score.html` in the same fixed scenario
+directory. Existing analyst work is not silently overwritten.
+
+### Synthetic telemetry replay
+
+Analysts can train without running file encryption:
+
+```bash
+python simulator.py --replay-scenario interrupted
+```
+
+Replay mode only prints the bundled JSONL evidence to stdout. It performs no
+network activity, process execution, encryption, or target discovery.
+
+See [`datasets/README.md`](datasets/README.md) and
+[`docs/soc-ir-exercises.md`](docs/soc-ir-exercises.md).
 
 ## JSON and HTML reporting
 
@@ -162,6 +235,8 @@ Schemas:
 
 - [`schemas/telemetry-v1.schema.json`](schemas/telemetry-v1.schema.json)
 - [`schemas/report-v1.schema.json`](schemas/report-v1.schema.json)
+- [`schemas/exercise-response-v1.schema.json`](schemas/exercise-response-v1.schema.json)
+- [`schemas/exercise-score-v1.schema.json`](schemas/exercise-score-v1.schema.json)
 
 ## Detection Pack
 
@@ -172,8 +247,18 @@ The defensive Detection Pack lives under [`detections/`](detections/):
 - Microsoft Sentinel / Defender example queries;
 - Splunk example searches.
 
-The content is intentionally scoped to known simulator artifacts and contains no
-bypass or evasion guidance.
+Validate it with:
+
+```bash
+python simulator.py --validate-detections
+```
+
+Validation checks include Sigma YAML parsing, required metadata, UUID IDs,
+duplicate IDs, `detection.condition`, ATT&CK tags, and SIEM/Sysmon guidance
+presence. GitHub Actions runs this as a dedicated CI job.
+
+The Detection Pack remains intentionally scoped to known simulator artifacts and
+contains no bypass or evasion guidance.
 
 See also:
 
@@ -200,17 +285,20 @@ successfully restored.
 python -m pytest -q
 ```
 
-GitHub Actions runs the suite on:
+GitHub Actions runs the regression suite on:
 
 - Ubuntu / Python 3.11
 - Ubuntu / Python 3.12
 - Windows / Python 3.11
 - Windows / Python 3.12
 
+A separate **Detection Pack Validation** CI job verifies defensive rule metadata
+and syntax.
+
 Tests cover containment, authorization, cross-platform path traversal,
 symlink/reparse safety, file/count limits, interrupted recovery, cleanup
-ownership verification, reporting, the Detection Pack, and the project safety
-contract.
+ownership verification, reporting, synthetic datasets, exercise scoring,
+Detection Pack validation, and the project safety contract.
 
 ## Scope limitation
 
