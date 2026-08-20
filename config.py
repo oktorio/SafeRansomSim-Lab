@@ -6,7 +6,9 @@ There is deliberately no user-configurable target directory.
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
-LAB_ROOT = (BASE_DIR / "ransomware_lab").resolve()
+# Keep LAB_ROOT lexical. The simulator separately resolves and validates it so a
+# symlink/reparse-point replacement cannot silently move the sandbox elsewhere.
+LAB_ROOT = BASE_DIR / "ransomware_lab"
 TARGET_ROOT = LAB_ROOT / "test123"
 BACKUP_ROOT = LAB_ROOT / "backups"
 LOG_ROOT = LAB_ROOT / "logs"
