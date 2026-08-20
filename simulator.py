@@ -15,7 +15,6 @@ import json
 import os
 import re
 import secrets
-import shutil
 import stat
 import sys
 import time
@@ -70,6 +69,23 @@ def canonical_within(path: Path, root: Path) -> Path:
     return canonical_path
 
 
+def reject_link_components(path: Path, root: Path) -> None:
+    """Reject any existing symlink/reparse point between root and path."""
+    canonical_within(path, root)
+    try:
+        relative = path.relative_to(root)
+    except ValueError as exc:
+        raise SafetyError(f"Path is not lexically contained by root: {path}") from exc
+
+    current = root
+    if current.exists() or current.is_symlink():
+        reject_link(current)
+    for part in relative.parts:
+        current = current / part
+        if current.exists() or current.is_symlink():
+            reject_link(current)
+
+
 def ensure_lab_integrity(create: bool = False) -> None:
     """Ensure the lexical lab directory has not been redirected elsewhere."""
     lexical_lab = config.BASE_DIR / "ransomware_lab"
@@ -81,7 +97,6 @@ def ensure_lab_integrity(create: bool = False) -> None:
     else:
         raise SafetyError("Lab directory does not exist; run --setup first.")
 
-    # Re-check after creation.
     reject_link(lexical_lab)
     canonical_within(lexical_lab, config.BASE_DIR)
 
@@ -97,6 +112,8 @@ def validate_manifest_relative(relative: str) -> Path:
         raise SafetyError("Invalid empty/NUL manifest path.")
     if relative.startswith(("//", "\\\\")) or re.match(r"^[A-Za-z]:", relative):
         raise SafetyError(f"Network/drive path rejected: {relative!r}")
+    if re.match(r"^[A-Za-z][A-Za-z0-9+.-]*://", relative):
+        raise SafetyError(f"URI-style path rejected: {relative!r}")
 
     rel = Path(relative)
     if rel.is_absolute() or rel.anchor:
@@ -114,14 +131,7 @@ def target_path(relative: str) -> Path:
     rel = validate_manifest_relative(relative)
     path = config.TARGET_ROOT / rel
     canonical_within(path, config.TARGET_ROOT)
-
-    current = config.TARGET_ROOT
-    if current.exists() or current.is_symlink():
-        reject_link(current)
-    for part in rel.parts:
-        current = current / part
-        if current.exists() or current.is_symlink():
-            reject_link(current)
+    reject_link_components(path, config.TARGET_ROOT)
     return path
 
 
@@ -129,16 +139,21 @@ def backup_path(relative: str) -> Path:
     rel = validate_manifest_relative(relative)
     path = config.BACKUP_ROOT / rel
     canonical_within(path, config.BACKUP_ROOT)
+    reject_link_components(path, config.BACKUP_ROOT)
     return path
 
 
 def atomic_write(path: Path, data: bytes, root: Path) -> None:
     canonical_within(path, root)
+    reject_link_components(path.parent, root)
     path.parent.mkdir(parents=True, exist_ok=True)
     canonical_within(path.parent, root)
-    reject_link(path.parent)
+    reject_link_components(path.parent, root)
+    if path.exists() or path.is_symlink():
+        reject_link(path)
     tmp = path.with_name(path.name + f".tmp-{uuid.uuid4().hex}")
     canonical_within(tmp, root)
+    reject_link_components(tmp.parent, root)
     with tmp.open("xb") as handle:
         handle.write(data)
         handle.flush()
@@ -148,10 +163,13 @@ def atomic_write(path: Path, data: bytes, root: Path) -> None:
 
 def log_event(event: str, session_id: str, **fields: Any) -> None:
     ensure_lab_integrity(create=False)
+    reject_link_components(config.LOG_ROOT, config.LAB_ROOT)
     config.LOG_ROOT.mkdir(parents=True, exist_ok=True)
     reject_link(config.LOG_ROOT)
     path = config.LOG_ROOT / "events.jsonl"
     canonical_within(path, config.LOG_ROOT)
+    if path.exists() or path.is_symlink():
+        reject_link(path)
     record = {
         "timestamp": utc_now(),
         "session_id": session_id,
@@ -243,6 +261,7 @@ def setup() -> None:
         if any(config.TARGET_ROOT.iterdir()):
             raise SafetyError("test123 is not empty; refusing to touch pre-existing files.")
     else:
+        reject_link_components(config.TARGET_ROOT.parent, config.LAB_ROOT)
         config.TARGET_ROOT.mkdir(parents=False)
 
     samples: dict[str, bytes] = {
@@ -282,7 +301,7 @@ def dry_run() -> None:
     manifest = load_manifest()
     inventory = validate_inventory(manifest)
     total = sum(path.stat().st_size for _, path in inventory)
-    print("DRY RUN - no file contents will be modified")
+    print("DRY RUN - no test-file contents will be modified")
     print(f"Fixed target: {config.TARGET_ROOT}")
     print(f"Eligible files: {len(inventory)} | Total bytes: {total}")
     for entry, path in inventory:
@@ -298,6 +317,7 @@ def dry_run() -> None:
 
 
 def write_key(key: bytes) -> None:
+    reject_link_components(config.RECOVERY_ROOT, config.LAB_ROOT)
     config.RECOVERY_ROOT.mkdir(parents=True, exist_ok=True)
     reject_link(config.RECOVERY_ROOT)
     content = config.KEY_LABEL + b"\n" + base64.b64encode(key) + b"\n"
@@ -322,13 +342,16 @@ def read_key() -> bytes:
     return key
 
 
-def create_ransom_note(session_id: str) -> None:
-    note = (
+def ransom_note_bytes() -> bytes:
+    return (
         "THIS IS A CYBERSECURITY LAB SIMULATION. NO REAL FILES WERE TARGETED.\n\n"
         "SafeRansomSim-Lab demonstrates constrained file-encryption telemetry and recovery.\n"
         "There are no payment instructions, cryptocurrency addresses, attacker contacts, or Tor links.\n"
     ).encode()
-    atomic_write(config.RANSOM_NOTE, note, config.TARGET_ROOT)
+
+
+def create_ransom_note(session_id: str) -> None:
+    atomic_write(config.RANSOM_NOTE, ransom_note_bytes(), config.TARGET_ROOT)
     log_event("RANSOM_NOTE_CREATED", session_id, destination_file=config.RANSOM_NOTE.name)
 
 
@@ -344,7 +367,8 @@ def simulate(initial_access: bool = False) -> None:
 
     manifest = load_manifest()
     inventory = validate_inventory(manifest)
-    if config.KEY_FILE.exists():
+    if config.KEY_FILE.exists() or config.KEY_FILE.is_symlink():
+        reject_link(config.KEY_FILE)
         raise SafetyError("Existing demo recovery key detected; recover/cleanup before another simulation.")
 
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -372,6 +396,7 @@ def simulate(initial_access: bool = False) -> None:
 
         backup = backup_path(relative)
         if backup.exists() or backup.is_symlink():
+            reject_link(backup)
             raise SafetyError(f"Backup already exists; refusing overwrite: {relative}")
         atomic_write(backup, before, config.BACKUP_ROOT)
         if sha256_file(backup) != entry["sha256"]:
@@ -382,13 +407,14 @@ def simulate(initial_access: bool = False) -> None:
         ciphertext = aesgcm.encrypt(nonce, before, aad)
         locked = path.with_name(path.name + config.LOCKED_SUFFIX)
         canonical_within(locked, config.TARGET_ROOT)
+        reject_link_components(locked, config.TARGET_ROOT)
         if locked.exists() or locked.is_symlink():
+            reject_link(locked)
             raise SafetyError(f"Locked output already exists: {relative}")
         blob = config.ENCRYPTED_MAGIC + nonce + ciphertext
         atomic_write(locked, blob, config.TARGET_ROOT)
         encrypted_hash = sha256_file(locked)
 
-        # Original is disposable, manifest-owned, marker-verified, and backed up.
         path.unlink()
         elapsed_ms = round((time.perf_counter() - started) * 1000, 3)
         encrypted_count += 1
@@ -430,10 +456,22 @@ def recover() -> None:
         original = target_path(relative)
         locked = original.with_name(original.name + config.LOCKED_SUFFIX)
         canonical_within(locked, config.TARGET_ROOT)
+        reject_link_components(locked, config.TARGET_ROOT)
 
-        if original.is_file() and sha256_file(original) == entry["sha256"]:
-            matched += 1
+        if original.exists() or original.is_symlink():
+            reject_link(original)
+            if original.is_file() and sha256_file(original) == entry["sha256"]:
+                matched += 1
+                continue
+            failed += 1
+            log_event(
+                "HASH_VERIFICATION_FAILURE",
+                session_id,
+                source_file=relative,
+                reason="original_path_conflict_refusing_overwrite",
+            )
             continue
+
         if not locked.is_file():
             failed += 1
             log_event("HASH_VERIFICATION_FAILURE", session_id, source_file=relative, reason="locked_file_missing")
@@ -470,7 +508,8 @@ def recover() -> None:
 
     if failed == 0 and matched == len(manifest["files"]) and config.RANSOM_NOTE.exists():
         reject_link(config.RANSOM_NOTE)
-        config.RANSOM_NOTE.unlink()
+        if config.RANSOM_NOTE.is_file() and config.RANSOM_NOTE.read_bytes() == ransom_note_bytes():
+            config.RANSOM_NOTE.unlink()
 
     print("Recovery verification")
     print(f"Files in manifest : {len(manifest['files'])}")
@@ -498,7 +537,11 @@ def status() -> None:
             for entry in manifest["files"]:
                 p = target_path(entry["relative_path"])
                 originals += int(p.is_file())
-                locked += int(p.with_name(p.name + config.LOCKED_SUFFIX).is_file())
+                candidate = p.with_name(p.name + config.LOCKED_SUFFIX)
+                canonical_within(candidate, config.TARGET_ROOT)
+                if candidate.exists() or candidate.is_symlink():
+                    reject_link(candidate)
+                locked += int(candidate.is_file())
         except SafetyError as exc:
             print(f"Manifest safety error: {exc}")
 
@@ -513,32 +556,153 @@ def status() -> None:
     print(f"Authorization     : {config.AUTH_FILE.is_file()}")
 
 
+def _delete_if_exact_file(path: Path, root: Path, expected: bytes) -> bool:
+    canonical_within(path, root)
+    reject_link_components(path, root)
+    if not path.exists() and not path.is_symlink():
+        return True
+    reject_link(path)
+    if not path.is_file() or path.read_bytes() != expected:
+        return False
+    path.unlink()
+    return True
+
+
+def _delete_if_hash(path: Path, root: Path, expected_sha256: str) -> bool:
+    canonical_within(path, root)
+    reject_link_components(path, root)
+    if not path.exists() and not path.is_symlink():
+        return True
+    reject_link(path)
+    if not path.is_file() or sha256_file(path) != expected_sha256:
+        return False
+    path.unlink()
+    return True
+
+
+def _prune_manifest_parents(paths: list[Path], root: Path) -> None:
+    parents: set[Path] = set()
+    for path in paths:
+        parent = path.parent
+        while parent != root and root in parent.parents:
+            parents.add(parent)
+            parent = parent.parent
+    for parent in sorted(parents, key=lambda p: len(p.parts), reverse=True):
+        if parent.exists() and not parent.is_symlink():
+            reject_link(parent)
+            try:
+                parent.rmdir()
+            except OSError:
+                pass
+
+
+def _events_log_is_simulator_owned(path: Path) -> bool:
+    if not path.is_file():
+        return False
+    try:
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            record = json.loads(line)
+            if not isinstance(record, dict) or "event" not in record or "session_id" not in record:
+                return False
+        return True
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return False
+
+
 def cleanup() -> None:
     session_id = uuid.uuid4().hex
     require_authorization(session_id)
-    # Fixed, non-user-configurable runtime paths only.
+    manifest = load_manifest()
+    conflicts: list[str] = []
+    target_paths: list[Path] = []
+    backup_paths: list[Path] = []
+
+    for entry in manifest["files"]:
+        relative = entry["relative_path"]
+        original = target_path(relative)
+        target_paths.append(original)
+        locked = original.with_name(original.name + config.LOCKED_SUFFIX)
+        canonical_within(locked, config.TARGET_ROOT)
+        reject_link_components(locked, config.TARGET_ROOT)
+
+        if original.exists() or original.is_symlink():
+            reject_link(original)
+            owned_original = False
+            if original.is_file():
+                with original.open("rb") as handle:
+                    marker = handle.read(len(config.TEST_MARKER))
+                owned_original = marker == config.TEST_MARKER and sha256_file(original) == entry["sha256"]
+            if owned_original:
+                original.unlink()
+            else:
+                conflicts.append(f"preserved unknown/conflicting file: {relative}")
+
+        if locked.exists() or locked.is_symlink():
+            reject_link(locked)
+            if locked.is_file() and locked.read_bytes().startswith(config.ENCRYPTED_MAGIC):
+                locked.unlink()
+            else:
+                conflicts.append(f"preserved unknown/conflicting locked path: {relative + config.LOCKED_SUFFIX}")
+
+        backup = backup_path(relative)
+        backup_paths.append(backup)
+        if not _delete_if_hash(backup, config.BACKUP_ROOT, entry["sha256"]):
+            conflicts.append(f"preserved unknown/conflicting backup: {relative}")
+
+    if not _delete_if_exact_file(config.RANSOM_NOTE, config.TARGET_ROOT, ransom_note_bytes()):
+        conflicts.append(f"preserved unknown/conflicting note: {config.RANSOM_NOTE.name}")
+
+    if config.KEY_FILE.exists() or config.KEY_FILE.is_symlink():
+        try:
+            read_key()
+        except (SafetyError, ValueError):
+            conflicts.append("preserved unknown/conflicting recovery key")
+        else:
+            config.KEY_FILE.unlink()
+
+    events = config.LOG_ROOT / "events.jsonl"
+    canonical_within(events, config.LOG_ROOT)
+    if events.exists() or events.is_symlink():
+        reject_link(events)
+        if _events_log_is_simulator_owned(events):
+            events.unlink()
+        else:
+            conflicts.append("preserved unknown/conflicting events log")
+
+    _prune_manifest_parents(target_paths, config.TARGET_ROOT)
+    _prune_manifest_parents(backup_paths, config.BACKUP_ROOT)
+
     for root in (config.TARGET_ROOT, config.BACKUP_ROOT, config.LOG_ROOT, config.RECOVERY_ROOT):
         canonical_within(root, config.LAB_ROOT)
-        if root.exists() or root.is_symlink():
+        if root.exists() and not root.is_symlink():
             reject_link(root)
-            shutil.rmtree(root)
-    for path in (config.MANIFEST_FILE, config.STOP_FILE):
-        canonical_within(path, config.LAB_ROOT)
-        if path.exists() or path.is_symlink():
-            reject_link(path)
-            path.unlink()
-    print("Removed simulator-generated runtime artifacts. Authorization file was preserved.")
+            try:
+                root.rmdir()
+            except OSError:
+                pass
+
+    if conflicts:
+        print("Cleanup preserved one or more non-owned/conflicting artifacts:")
+        for item in conflicts:
+            print(f"  - {item}")
+        print("Manifest was preserved so the lab state can be reviewed safely.")
+    else:
+        reject_link(config.MANIFEST_FILE)
+        config.MANIFEST_FILE.unlink()
+        print("Removed only simulator-owned runtime artifacts. Authorization and kill-switch files were preserved.")
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Safe, fixed-sandbox ransomware behavior simulator")
     modes = parser.add_mutually_exclusive_group()
     modes.add_argument("--setup", action="store_true", help="create disposable lab files")
-    modes.add_argument("--dry-run", action="store_true", help="show eligible files without modification")
+    modes.add_argument("--dry-run", action="store_true", help="show eligible files without modifying test files")
     modes.add_argument("--simulate", action="store_true", help="run controlled fixed-sandbox encryption simulation")
     modes.add_argument("--recover", action="store_true", help="decrypt and SHA-256 verify disposable lab files")
     modes.add_argument("--status", action="store_true", help="show current lab state")
-    modes.add_argument("--cleanup", action="store_true", help="remove simulator-generated runtime artifacts")
+    modes.add_argument("--cleanup", action="store_true", help="remove only simulator-owned runtime artifacts")
     modes.add_argument(
         "--simulate-initial-access",
         action="store_true",
