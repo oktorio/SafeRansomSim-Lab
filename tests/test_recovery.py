@@ -59,3 +59,32 @@ def test_cleanup_preserves_unmanifested_file(isolated_lab: Path) -> None:
     assert extra.is_file()
     assert extra.read_bytes() == content
     assert config.AUTH_FILE.is_file()
+    assert config.MANIFEST_FILE.is_file()
+
+
+def test_cleanup_requires_crypto_proof_for_locked_artifact(isolated_lab: Path) -> None:
+    manifest = simulator.load_manifest()
+    relative = manifest["files"][0]["relative_path"]
+
+    simulator.simulate()
+
+    original = simulator.target_path(relative)
+    locked = original.with_name(original.name + config.LOCKED_SUFFIX)
+    forged = config.ENCRYPTED_MAGIC + b"not-a-valid-aes-gcm-artifact"
+    locked.write_bytes(forged)
+
+    simulator.cleanup()
+
+    assert locked.is_file()
+    assert locked.read_bytes() == forged
+    assert config.MANIFEST_FILE.is_file()
+    assert config.KEY_FILE.is_file()
+
+
+def test_cleanup_removes_valid_verified_simulator_artifacts(isolated_lab: Path) -> None:
+    simulator.simulate()
+    simulator.cleanup()
+
+    assert not config.MANIFEST_FILE.exists()
+    assert not config.KEY_FILE.exists()
+    assert config.AUTH_FILE.is_file()
