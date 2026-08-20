@@ -1,0 +1,19 @@
+name: Defensive feature request
+description: Suggest a detection, testing, reporting, or SOC/IR improvement
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Defensive use case
+      description: What blue-team, testing, evidence, or education problem should be solved?
+    validations:
+      required: true
+  - type: textarea
+    id: safety
+    attributes:
+      label: Safety-boundary impact
+      description: Explain why this does not require arbitrary targets, network/process execution, persistence, propagation, credential access, or evasion.
+    validations:
+      required: true
