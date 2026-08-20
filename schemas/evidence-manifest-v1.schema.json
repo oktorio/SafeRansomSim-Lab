@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/saferansomsim/evidence-manifest-v1.schema.json",
+  "title": "SafeRansomSim-Lab Evidence Manifest v1",
+  "type": "object",
+  "required": ["schema_version", "project", "project_version", "scenario_id", "generated_at", "evidence", "artifacts"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "project": {"const": "SafeRansomSim-Lab"},
+    "project_version": {"type": "string"},
+    "scenario_id": {"enum": ["basic", "interrupted", "recovery-failure", "false-positive"]},
+    "generated_at": {"type": "string"},
+    "evidence": {"type": "array", "items": {"$ref": "#/$defs/file"}},
+    "artifacts": {"type": "array", "items": {"$ref": "#/$defs/file"}}
+  },
+  "$defs": {
+    "file": {
+      "type": "object",
+      "required": ["scope", "path", "sha256", "size"],
+      "properties": {
+        "scope": {"enum": ["exercise", "repository"]},
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "size": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
