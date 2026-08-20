@@ -20,6 +20,7 @@ def test_cli_exposes_no_arbitrary_target_or_external_input_option() -> None:
     for forbidden in (
         "--target", "--path", "--directory", "--root", "--share", "--host",
         "--dataset", "--input", "--output", "--response-file", "--config-file",
+        "--command", "--url", "--endpoint",
     ):
         assert forbidden not in options
 
@@ -27,7 +28,7 @@ def test_cli_exposes_no_arbitrary_target_or_external_input_option() -> None:
 def test_scenario_cli_choices_are_fixed() -> None:
     actions = {option: action for action in build_parser()._actions for option in action.option_strings}
     expected = {"basic", "interrupted", "recovery-failure", "false-positive"}
-    for option in ("--exercise", "--replay-scenario", "--score-exercise"):
+    for option in ("--exercise", "--replay-scenario", "--score-exercise", "--verify-evidence"):
         assert set(actions[option].choices) == expected
 
 
@@ -67,8 +68,8 @@ def test_compatibility_entrypoint_stays_thin() -> None:
     lines = (root / "simulator.py").read_text(encoding="utf-8").splitlines()
     assert len(lines) < 60
     required_modules = {
-        "safety.py", "manifest.py", "crypto_demo.py", "telemetry.py",
-        "reporting.py", "engine.py", "cli.py", "scenarios.py",
-        "exercises.py", "scoring.py", "detection_validation.py",
+        "safety.py", "manifest.py", "crypto_demo.py", "telemetry.py", "reporting.py",
+        "engine.py", "cli.py", "scenarios.py", "exercises.py", "scoring.py",
+        "detection_validation.py", "evidence.py", "schema_validation.py",
     }
     assert required_modules.issubset({path.name for path in (root / "saferansomsim").glob("*.py")})

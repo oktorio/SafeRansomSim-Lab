@@ -1,307 +1,147 @@
 # SafeRansomSim-Lab
 
-**Current lab release: `v0.3.0-lab`**
+**Current lab release: `v0.4.0-lab`**
 
-A deliberately constrained, non-propagating ransomware-behavior simulator and
-blue-team exercise framework for cybersecurity education, detection engineering,
-incident response, cryptography learning, and recovery testing.
+SafeRansomSim-Lab is a deliberately constrained, non-propagating ransomware-behavior simulator and blue-team SOC/IR exercise framework. It prioritizes containment, reversibility, observability, evidence integrity, and defensive learning over offensive realism.
 
-> **THIS SOFTWARE IS A NON-PROPAGATING EDUCATIONAL RANSOMWARE SIMULATOR. IT IS
-> DESIGNED TO OPERATE ONLY ON DISPOSABLE FILES CREATED INSIDE ITS OWN SANDBOX.**
+> **NON-PROPAGATING EDUCATIONAL LAB ONLY.** Simulation file operations are limited to disposable files created by the project inside `./ransomware_lab/test123/`.
 
-## VM-first safety guidance
+## Safety boundary
 
-Use a **disposable VM** for simulation runs. Recommended controls:
+The CLI has no arbitrary target, path, host, share, external dataset, external response-file, command, or remote-execution option. The project intentionally implements no network/C2, persistence, propagation, credential theft, privilege escalation, security-tool disabling, backup destruction, or evasion.
 
-- run as a normal, non-administrator/non-root user;
-- take a VM snapshot before the exercise;
-- do not mount host drives or shared folders;
-- disable host/guest file sharing where practical;
-- no network connectivity is required by the simulator;
-- run `python simulator.py --dry-run` and `python -m pytest -q` before the first
-  `--simulate` execution.
+Use a disposable VM, run as a normal non-admin/non-root user, take a snapshot first, and do not mount host drives or shared folders. Synthetic SOC/IR exercises can be used without running encryption at all.
 
-The synthetic SOC/IR exercises can be used without running encryption at all.
+## v0.4 hardening
 
-## Safety model
+`v0.4.0-lab` adds engineering and evidence controls around the existing defensive lab:
 
-The only file-processing target is hard-coded to:
+- pinned direct Python dependencies;
+- SHA-pinned GitHub Actions;
+- weekly Dependabot updates for pip and GitHub Actions;
+- CodeQL scanning;
+- dependency vulnerability auditing with `pip-audit`;
+- JSON Schema validation for bundled datasets and generated artifact models;
+- SHA-256 evidence manifests for SOC/IR exercises;
+- evidence verification before scoring and post-score artifact hashing;
+- mutation-safety regression tests;
+- `SECURITY.md`, `CONTRIBUTING.md`, CODEOWNERS, PR/issue templates, and a release checklist.
 
-```text
-./ransomware_lab/test123/
-```
-
-The CLI intentionally has **no arbitrary target, path, directory, host, share,
-dataset file, response file, remote execution, or command option**.
-
-Core safeguards include:
-
-- dry-run is the default behavior;
-- modification requires an explicit simulation command and exact authorization marker;
-- only simulator-generated, manifest-recorded, marker-bearing disposable files are eligible;
-- canonical containment checks and symlink/reparse-point rejection;
-- traversal rejection for both `/` and `\\` path forms;
-- maximum 100 files, 5 MiB per file, 100 MiB total, recursion depth 3;
-- kill switch at `ransomware_lab/STOP_SIMULATION`;
-- verified local backup before reversible encryption;
-- AES-256-GCM through the high-level `cryptography` library;
-- SHA-256 verified recovery;
-- cleanup removes only cryptographically or hash-verified simulator-owned runtime artifacts;
-- no persistence, propagation, lateral movement, privilege escalation, C2,
-  credential theft, exfiltration, security-tool disabling, backup destruction,
-  or evasion;
-- no network activity.
-
-Automated **safety-contract tests** fail if prohibited target/external-input
-options or network/remote-execution/process capability imports are introduced.
-
-## Architecture
-
-```text
-SafeRansomSim-Lab/
-├── simulator.py
-├── config.py
-├── saferansomsim/
-│   ├── cli.py
-│   ├── config.py
-│   ├── safety.py
-│   ├── manifest.py
-│   ├── crypto_demo.py
-│   ├── telemetry.py
-│   ├── reporting.py
-│   ├── engine.py
-│   ├── scenarios.py
-│   ├── exercises.py
-│   ├── scoring.py
-│   └── detection_validation.py
-├── datasets/
-│   ├── basic/
-│   ├── interrupted/
-│   ├── recovery-failure/
-│   └── false-positive/
-├── detections/
-│   ├── sigma/
-│   ├── sysmon/
-│   └── siem/
-├── schemas/
-├── tests/
-└── docs/
-```
-
-See [`docs/architecture.md`](docs/architecture.md) and
-[`docs/soc-ir-exercises.md`](docs/soc-ir-exercises.md).
-
-## Quick start
-
-Install:
+## Quick validation
 
 ```bash
 python -m pip install -r requirements.txt
+python -m pytest -q
+python simulator.py --validate-detections
+python simulator.py --validate-schemas
 ```
 
-Create disposable files:
+The default command remains a dry run. A controlled file-transform simulation still requires the fixed sandbox, explicit authorization marker, manifest-owned disposable files, and all containment checks.
+
+## SOC/IR exercises
+
+Bundled scenarios:
+
+```text
+basic
+interrupted
+recovery-failure
+false-positive
+```
+
+List and prepare:
+
+```bash
+python simulator.py --list-scenarios
+python simulator.py --exercise basic
+```
+
+Exercise artifacts are created only under:
+
+```text
+ransomware_lab/exercises/<scenario>/
+```
+
+A prepared exercise contains synthetic evidence, an analyst worksheet, and `evidence-manifest.json`. Verify evidence before using it:
+
+```bash
+python simulator.py --verify-evidence basic
+```
+
+Complete `analyst-response.json`, then score:
+
+```bash
+python simulator.py --score-exercise basic
+```
+
+Scoring refuses to proceed if the immutable exercise evidence fails SHA-256 verification. After scoring, the analyst response and JSON/HTML score artifacts are added to the evidence manifest and verified again.
+
+Analysts can also replay bundled synthetic telemetry without encryption:
+
+```bash
+python simulator.py --replay-scenario interrupted
+```
+
+## Simulator commands
 
 ```bash
 python simulator.py --setup
-```
-
-Create explicit authorization:
-
-```bash
-cp ransomware_lab/AUTHORIZED_LAB.example.txt ransomware_lab/AUTHORIZED_LAB.txt
-```
-
-PowerShell:
-
-```powershell
-Copy-Item ransomware_lab/AUTHORIZED_LAB.example.txt ransomware_lab/AUTHORIZED_LAB.txt
-```
-
-Validate first:
-
-```bash
 python simulator.py --dry-run
-python -m pytest -q
-python simulator.py --validate-detections
-```
-
-Run the controlled simulation:
-
-```bash
 python simulator.py --simulate
-```
-
-Recover:
-
-```bash
 python simulator.py --recover
-```
-
-Other simulation commands:
-
-```bash
 python simulator.py --status
 python simulator.py --cleanup
 python simulator.py --simulate-initial-access
 python simulator.py --version
 ```
 
-`--simulate-initial-access` emits only a harmless local telemetry event
-representing a training scenario. It does not create or deliver an email,
-attachment, macro, exploit, downloader, or phishing page.
+`--simulate-initial-access` records only a harmless local training telemetry event. It does not create or deliver email, attachments, macros, exploits, downloaders, or phishing pages.
 
-## SOC/IR Exercise Framework
-
-`v0.3.0-lab` adds four fixed, synthetic scenarios:
-
-- `basic`
-- `interrupted`
-- `recovery-failure`
-- `false-positive`
-
-List them:
-
-```bash
-python simulator.py --list-scenarios
-```
-
-Prepare an exercise:
-
-```bash
-python simulator.py --exercise basic
-```
-
-This creates only fixed-root exercise artifacts:
-
-```text
-ransomware_lab/exercises/basic/
-├── LAB_NOTICE.txt
-├── briefing.md
-├── analyst-response.json
-└── evidence/
-    └── events.jsonl
-```
-
-Edit `analyst-response.json`, then score it:
-
-```bash
-python simulator.py --score-exercise basic
-```
-
-The score is deterministic out of 100 points:
-
-- classification: 25;
-- evidence identification: 25;
-- containment: 20;
-- recovery: 20;
-- false-positive handling: 10.
-
-The framework writes `score.json` and `score.html` in the same fixed scenario
-directory. Existing analyst work is not silently overwritten.
-
-### Synthetic telemetry replay
-
-Analysts can train without running file encryption:
-
-```bash
-python simulator.py --replay-scenario interrupted
-```
-
-Replay mode only prints the bundled JSONL evidence to stdout. It performs no
-network activity, process execution, encryption, or target discovery.
-
-See [`datasets/README.md`](datasets/README.md) and
-[`docs/soc-ir-exercises.md`](docs/soc-ir-exercises.md).
-
-## JSON and HTML reporting
-
-Each setup, dry-run, simulation, recovery, or cleanup run writes evidence under:
-
-```text
-ransomware_lab/reports/
-```
-
-Reports are fixed-root, non-networked, and generated as:
-
-```text
-run-<session-id>.json
-run-<session-id>.html
-```
-
-They include run summary, safety-boundary declarations, and telemetry event
-counts. Reports are intentionally preserved by `--cleanup` for lab evidence.
-
-Schemas:
-
-- [`schemas/telemetry-v1.schema.json`](schemas/telemetry-v1.schema.json)
-- [`schemas/report-v1.schema.json`](schemas/report-v1.schema.json)
-- [`schemas/exercise-response-v1.schema.json`](schemas/exercise-response-v1.schema.json)
-- [`schemas/exercise-score-v1.schema.json`](schemas/exercise-score-v1.schema.json)
-
-## Detection Pack
-
-The defensive Detection Pack lives under [`detections/`](detections/):
-
-- Sigma examples for `.SIMULATED_LOCKED` and the simulated note;
-- Sysmon observation guidance;
-- Microsoft Sentinel / Defender example queries;
-- Splunk example searches.
-
-Validate it with:
+## Detection and schema validation
 
 ```bash
 python simulator.py --validate-detections
+python simulator.py --validate-schemas
 ```
 
-Validation checks include Sigma YAML parsing, required metadata, UUID IDs,
-duplicate IDs, `detection.condition`, ATT&CK tags, and SIEM/Sysmon guidance
-presence. GitHub Actions runs this as a dedicated CI job.
+The Detection Pack includes lab-specific Sigma examples, Sysmon observation guidance, Microsoft Sentinel/Defender examples, and Splunk examples. Schema validation checks all repository schemas, bundled JSONL scenario events, exercise response/score models, report structure, and evidence-manifest structure.
 
-The Detection Pack remains intentionally scoped to known simulator artifacts and
-contains no bypass or evasion guidance.
-
-See also:
-
-- [`docs/detection-engineering.md`](docs/detection-engineering.md)
-- [`docs/mitre-attack-mapping.md`](docs/mitre-attack-mapping.md)
-- [`docs/incident-response-exercise.md`](docs/incident-response-exercise.md)
-
-## Cryptographic demonstration
-
-The lab uses AES-256-GCM with a fresh random 96-bit nonce for each disposable
-file. A local demo recovery key is written only to:
+## Architecture
 
 ```text
-ransomware_lab/recovery/demo_key.bin
+saferansomsim/
+  cli.py
+  config.py
+  safety.py
+  manifest.py
+  crypto_demo.py
+  telemetry.py
+  reporting.py
+  engine.py
+  scenarios.py
+  exercises.py
+  scoring.py
+  evidence.py
+  detection_validation.py
+  schema_validation.py
+
+datasets/           fixed synthetic SOC/IR telemetry
+detections/         defensive Detection Pack
+schemas/            versioned JSON Schemas
+tests/              containment, recovery, evidence, mutation, schema tests
+.github/             CI, CodeQL, Dependabot, governance templates
 ```
 
-No custom cryptographic primitive is implemented. Recovery verifies the
-decrypted plaintext against the original manifest SHA-256 before treating it as
-successfully restored.
+See `docs/architecture.md`, `docs/soc-ir-exercises.md`, and `docs/release-checklist.md`.
 
-## Testing
+## CI and supply-chain controls
 
-```bash
-python -m pytest -q
-```
+GitHub Actions runs the safety suite on Ubuntu and Windows with Python 3.11 and 3.12, plus dedicated Detection Pack Validation, Schema Validation, Dependency Audit, and CodeQL jobs. External GitHub Actions are referenced by immutable commit SHA; Dependabot is configured to propose updates rather than relying on moving major-version tags.
 
-GitHub Actions runs the regression suite on:
+## Governance
 
-- Ubuntu / Python 3.11
-- Ubuntu / Python 3.12
-- Windows / Python 3.11
-- Windows / Python 3.12
-
-A separate **Detection Pack Validation** CI job verifies defensive rule metadata
-and syntax.
-
-Tests cover containment, authorization, cross-platform path traversal,
-symlink/reparse safety, file/count limits, interrupted recovery, cleanup
-ownership verification, reporting, synthetic datasets, exercise scoring,
-Detection Pack validation, and the project safety contract.
+Security-sensitive findings should follow `SECURITY.md`. Contributions must follow the safety contract in `CONTRIBUTING.md`. Safety-critical changes should include regression or mutation tests proving the guardrail remains enforced.
 
 ## Scope limitation
 
-This project deliberately sacrifices offensive realism for containment,
-reversibility, observability, and defensive learning value. It is not intended
-to reproduce a deployable ransomware payload.
+This project intentionally sacrifices offensive realism for containment, reversibility, evidence quality, and defensive training. It is not intended to reproduce or deliver deployable ransomware.

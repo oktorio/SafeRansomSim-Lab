@@ -1,4 +1,4 @@
-"""Command-line interface. No arbitrary target path is exposed."""
+"""Command-line interface. No arbitrary target path or external evidence input is exposed."""
 
 from __future__ import annotations
 
@@ -9,9 +9,10 @@ import sys
 from . import config
 from .detection_validation import assert_detection_pack_valid
 from .engine import cleanup, dry_run, recover, setup, simulate, status
-from .exercises import prepare_exercise, replay_scenario, score_exercise
+from .exercises import prepare_exercise, replay_scenario, score_exercise, verify_exercise_evidence
 from .safety import SafetyError
 from .scenarios import SCENARIOS, scenario_ids
+from .schema_validation import assert_repository_schemas_valid
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -29,7 +30,9 @@ def build_parser() -> argparse.ArgumentParser:
     modes.add_argument("--exercise", choices=scenario_ids(), metavar="SCENARIO", help="prepare a fixed bundled SOC/IR exercise")
     modes.add_argument("--replay-scenario", choices=scenario_ids(), metavar="SCENARIO", help="print bundled synthetic telemetry for a scenario")
     modes.add_argument("--score-exercise", choices=scenario_ids(), metavar="SCENARIO", help="score the fixed analyst-response.json for a prepared scenario")
+    modes.add_argument("--verify-evidence", choices=scenario_ids(), metavar="SCENARIO", help="verify the fixed exercise evidence manifest")
     modes.add_argument("--validate-detections", action="store_true", help="validate defensive Detection Pack metadata and syntax")
+    modes.add_argument("--validate-schemas", action="store_true", help="validate repository JSON schemas and bundled synthetic artifacts")
     return parser
 
 
@@ -60,10 +63,13 @@ def main() -> int:
             for event in replay_scenario(args.replay_scenario):
                 print(json.dumps(event, sort_keys=True))
         elif args.score_exercise:
-            result = score_exercise(args.score_exercise)
-            print(json.dumps(result, indent=2, sort_keys=True))
+            print(json.dumps(score_exercise(args.score_exercise), indent=2, sort_keys=True))
+        elif args.verify_evidence:
+            print(json.dumps(verify_exercise_evidence(args.verify_evidence), indent=2, sort_keys=True))
         elif args.validate_detections:
             print(json.dumps(assert_detection_pack_valid(), indent=2, sort_keys=True))
+        elif args.validate_schemas:
+            print(json.dumps(assert_repository_schemas_valid(), indent=2, sort_keys=True))
         else:
             dry_run()
         return 0
