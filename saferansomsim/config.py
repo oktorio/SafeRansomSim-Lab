@@ -6,7 +6,7 @@ No target path is configurable by environment variable, CLI flag, or config file
 from pathlib import Path
 
 PROJECT_NAME = "SafeRansomSim-Lab"
-PROJECT_VERSION = "0.4.0-lab"
+PROJECT_VERSION = "0.5.0-lab"
 TELEMETRY_SCHEMA_VERSION = 1
 REPORT_SCHEMA_VERSION = 1
 

@@ -8,7 +8,7 @@
     "schema_version": {"const": 1},
     "project": {"const": "SafeRansomSim-Lab"},
     "project_version": {"type": "string"},
-    "scenario_id": {"enum": ["basic", "interrupted", "recovery-failure", "false-positive"]},
+    "scenario_id": {"enum": ["basic", "interrupted", "recovery-failure", "false-positive", "benign-backup-burst", "mixed-signal", "telemetry-gap"]},
     "generated_at": {"type": "string"},
     "evidence": {"type": "array", "items": {"$ref": "#/$defs/file"}},
     "artifacts": {"type": "array", "items": {"$ref": "#/$defs/file"}}
