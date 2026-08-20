@@ -1,5 +1,26 @@
 # Changelog
 
+## v0.4.0-lab — 2026-08-20
+
+### Added
+- SHA-256 evidence manifests for fixed SOC/IR exercises, including bundled synthetic evidence and defensive Detection Pack files.
+- Evidence verification command and pre-score integrity gate.
+- Post-score hashing of analyst response and JSON/HTML score artifacts.
+- Evidence-manifest JSON Schema.
+- Repository-wide JSON Schema validation command and dedicated CI job.
+- Mutation-safety regression tests for target-root mutation, arbitrary CLI input attempts, scenario path injection, and evidence tampering.
+- CodeQL workflow, dependency audit, Dependabot configuration, and immutable GitHub Action SHA pins.
+- `SECURITY.md`, `CONTRIBUTING.md`, CODEOWNERS, pull-request template, issue templates, and release checklist.
+
+### Changed
+- Direct Python dependencies are pinned for reproducible CI/lab setup.
+- Exercise scoring refuses to score when immutable evidence integrity verification fails.
+- Safety contract includes evidence/schema modules and fixed `--verify-evidence` scenario choices.
+
+### Safety
+- No arbitrary target, external dataset, host, path, command, process execution, or network capability was introduced.
+- The v0.4 milestone is engineering/evidence hardening only; simulation behavior is not made more offensive or deployable.
+
 ## v0.3.0-lab — 2026-08-20
 
 ### Added
